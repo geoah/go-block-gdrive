@@ -36,10 +36,12 @@ func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
 		logrus.WithError(err).Warningf("error reading chunk %s", cr.chunkID)
 		return 0, err
 	}
-	// TODO Check if this is over the size of the device?
-	// fmt.Printf("___ [%d:%d] vs [%d:%d]\n", off, off+int64(len(b)), cr.offsetStart, cr.chunkOffsetEnd)
-	// fmt.Printf(">>> GET(%s) [%x]\n", cr.chunkID, cb[cr.chunkOffset:cr.chunkOffsetEnd])
-	n := copy(b, cb[cr.chunkOffset:cr.chunkOffsetEnd])
+	if cb != nil {
+		// TODO Check if this is over the size of the device?
+		// fmt.Printf("___ [%d:%d] vs [%d:%d]\n", off, off+int64(len(b)), cr.offsetStart, cr.chunkOffsetEnd)
+		// fmt.Printf(">>> GET(%s) [%x]\n", cr.chunkID, cb[cr.chunkOffset:cr.chunkOffsetEnd])
+		n := copy(b, cb[cr.chunkOffset:cr.chunkOffsetEnd])
+	}
 	d.lock.RUnlock(cr.chunkID)
 	return n, nil
 }
