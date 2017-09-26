@@ -10,8 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/geoah/go-block-gdrive/chunks"
-	"github.com/geoah/go-block-gdrive/store"
 	"github.com/geoah/go-block-gdrive/nbd"
+	"github.com/geoah/go-block-gdrive/store"
 )
 
 func main() {
@@ -76,8 +76,8 @@ func main() {
 	<-c
 }
 
-// nbd.IOCTL() helper function
-func nbd.IOCTL(a1, a2, a3 uintptr) (err error) {
+// IOCTL helper function
+func IOCTL(a1, a2, a3 uintptr) (err error) {
 	_, _, errno := syscall.Syscall(syscall.SYS_nbd.IOCTL, a1, a2, a3)
 	if errno != 0 {
 		err = errno

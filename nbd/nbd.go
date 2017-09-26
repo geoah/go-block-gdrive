@@ -2,7 +2,7 @@
 // License: MIT
 
 // Package buse uses the Linux NBD layer to emulate a block device in user space
-package ndb
+package nbd
 
 import (
 	"encoding/binary"
