@@ -56,12 +56,14 @@ func (d *ChunkedDevice) WriteAt(b []byte, off int64) (int, error) {
 	n := 0
 	// find first chunk we need to write to
 	for {
-		// update how much is left to write
+		// current size to write
 		csize := left
-		if left > d.chunkSize {
+		// check max size
+		if left >= d.chunkSize {
 			csize = d.chunkSize
-			left = left - d.chunkSize
 		}
+		// update how much is left to write
+		left -= csize
 		// find the chunk we need to write to
 		cr, _ := d.getChunkInfo(coff, csize)
 		// update the offset for the next write
@@ -84,8 +86,6 @@ func (d *ChunkedDevice) WriteAt(b []byte, off int64) (int, error) {
 		d.lock.Unlock(cr.chunkID)
 		// update boff
 		boff += csize
-		// update left
-		left -= csize
 		// are we dont yet?
 		if left == 0 {
 			break
