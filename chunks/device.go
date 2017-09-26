@@ -112,7 +112,7 @@ func (d *ChunkedDevice) getChunkInfo(off int64, size int64) (Info, error) {
 	ci := Info{
 		offsetStart:    offStart,
 		offsetEnd:      offEnd,
-		chunkID:        fmt.Sprintf("part:%d", part),
+		chunkID:        fmt.Sprintf("part-%d", part),
 		chunkOffset:    chunkOff,
 		chunkOffsetEnd: chunkOff + int64(size),
 	}

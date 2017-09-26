@@ -4,9 +4,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-
-	"github.com/sirupsen/logrus"
 )
+
+func NewFileStore(path string) (Store, error) {
+	s := &FileStore{
+		path: path,
+	}
+	return s, nil
+}
 
 type FileStore struct {
 	path string
@@ -14,19 +19,11 @@ type FileStore struct {
 
 func (s *FileStore) Put(chunkID string, b []byte) (int, error) {
 	fn := s.getFilename(chunkID)
-	fl, err := os.Create(fn)
-	if err != nil {
-		return 0, err
-	}
-	defer fl.Close()
-
-	n, err := fl.Write(b)
-	if err != nil {
-		logrus.Warningf("error writing file %s, err: %s", chunkID, err)
+	if err := ioutil.WriteFile(fn, b, 0644); err != nil {
 		return 0, err
 	}
 
-	return n, nil
+	return len(b), nil
 }
 
 func (s *FileStore) Get(chunkID string) ([]byte, error) {
