@@ -28,7 +28,7 @@ type ChunkedDevice struct {
 }
 
 func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
-	logrus.WithField("offset", off).WithField("size", len(b)).Debugf("ReadAt")
+	// logrus.WithField("offset", off).WithField("size", len(b)).Debugf("ReadAt")
 	cr, _ := d.getChunkInfo(off, int64(len(b)))
 	d.lock.RLock(cr.chunkID)
 	cb, err := d.store.Get(cr.chunkID)
@@ -48,7 +48,7 @@ func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
 }
 
 func (d *ChunkedDevice) WriteAt(b []byte, off int64) (int, error) {
-	logrus.WithField("offset", off).WithField("size", len(b)).Debugf("WriteAt")
+	// logrus.WithField("offset", off).WithField("size", len(b)).Debugf("WriteAt")
 	size := int64(len(b))
 	left := size
 	coff := off
