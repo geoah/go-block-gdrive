@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/libopenstorage/openstorage/volume/drivers/buse"
 	"github.com/sirupsen/logrus"
 
 	"github.com/geoah/go-block-gdrive/chunks"
 	"github.com/geoah/go-block-gdrive/store"
+	"github.com/geoah/go-block-gdrive/nbd"
 )
 
 func main() {
@@ -35,21 +35,21 @@ func main() {
 		logrus.Debugf("Cleaning up %s", dev)
 
 		if f, err := os.Open(dev); err == nil {
-			ioctl(f.Fd(), buse.NBD_DISCONNECT, 0)
-			ioctl(f.Fd(), buse.NBD_CLEAR_QUE, 0)
-			ioctl(f.Fd(), buse.NBD_CLEAR_SOCK, 0)
+			nbd.IOCTL(f.Fd(), nbd.NBD_DISCONNECT, 0)
+			nbd.IOCTL(f.Fd(), nbd.NBD_CLEAR_QUE, 0)
+			nbd.IOCTL(f.Fd(), nbd.NBD_CLEAR_SOCK, 0)
 
 			f.Close()
 		}
 	}
 
-	logrus.Infof("Creating device...")
+	logrus.Infof("Creating device and interface...")
 	ms, _ := store.NewMemoryStore(4096)
 	ld, _ := chunks.NewChunkedDevice(ms, 4096*1000, 4096)
-	nbd := buse.Create(ld, "local-aaa", 4096*1000)
+	ni := nbd.Create(ld, "local-aaa", 4096*1000)
 
 	logrus.Infof("Creating to device...")
-	dev, err := nbd.Connect()
+	dev, err := ni.Connect()
 	if err != nil {
 		logrus.WithError(err).Fatalf("Could not connect device")
 	}
@@ -76,9 +76,9 @@ func main() {
 	<-c
 }
 
-// ioctl() helper function
-func ioctl(a1, a2, a3 uintptr) (err error) {
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, a1, a2, a3)
+// nbd.IOCTL() helper function
+func nbd.IOCTL(a1, a2, a3 uintptr) (err error) {
+	_, _, errno := syscall.Syscall(syscall.SYS_nbd.IOCTL, a1, a2, a3)
 	if errno != 0 {
 		err = errno
 	}
