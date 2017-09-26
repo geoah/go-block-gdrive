@@ -61,7 +61,9 @@ func main() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		<-c
-		logrus.Infof("Disconnecting device")
+		logrus.Infof("Unmounting dev...")
+		syscall.Unmount(dev, syscall.MNT_DETACH)
+		logrus.Infof("Disconnecting device...")
 		ni.Disconnect()
 		logrus.Infof("Done cleaning up NBD devices")
 		os.Exit(0)
