@@ -1,5 +1,14 @@
 package store
 
+func NewMemoryStore(chunkSize int64) (Store, error) {
+	s := &MemoryStore{
+		chunkSize: chunkSize,
+		chunks:    map[string][]byte{},
+	}
+
+	return s, nil
+}
+
 type MemoryStore struct {
 	chunkSize int64
 	chunks    map[string][]byte

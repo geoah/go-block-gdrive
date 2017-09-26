@@ -3,7 +3,7 @@ updated: 2017-09-26T13:20:13.685867961+01:00
 imports:
 - name: github.com/GitbookIO/syncgroup
   version: fa1bffcc8e3e62a3c3c85c9682c2a40a1cfbe38b
-- name: github.com/libopenstorage/libopenstorage
+- name: github.com/libopenstorage/openstorage
   version: a302e1850749551de28693d12b83f448a9d1d92e
   subpackages:
   - volume/drivers/buse

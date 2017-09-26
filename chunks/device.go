@@ -4,10 +4,21 @@ import (
 	"fmt"
 
 	"github.com/GitbookIO/syncgroup"
+	"github.com/libopenstorage/openstorage/volume/drivers/buse"
 	"github.com/sirupsen/logrus"
 
 	"github.com/geoah/go-block-gdrive/store"
 )
+
+func NewChunkedDevice(store store.Store, size, chunkSize int64) (buse.Device, error) {
+	d := &ChunkedDevice{
+		size:      size,
+		chunkSize: chunkSize,
+		store:     store,
+		lock:      syncgroup.NewMutexGroup(),
+	}
+	return d, nil
+}
 
 type ChunkedDevice struct {
 	size      int64

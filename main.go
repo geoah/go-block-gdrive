@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/GitbookIO/syncgroup"
 	"github.com/libopenstorage/openstorage/volume/drivers/buse"
 	"github.com/sirupsen/logrus"
 
@@ -36,26 +35,18 @@ func main() {
 		logrus.Debugf("Cleaning up %s", dev)
 
 		if f, err := os.Open(dev); err == nil {
-			ioctl(f.Fd(), NBD_DISCONNECT, 0)
-			ioctl(f.Fd(), NBD_CLEAR_QUE, 0)
-			ioctl(f.Fd(), NBD_CLEAR_SOCK, 0)
+			ioctl(f.Fd(), buse.NBD_DISCONNECT, 0)
+			ioctl(f.Fd(), buse.NBD_CLEAR_QUE, 0)
+			ioctl(f.Fd(), buse.NBD_CLEAR_SOCK, 0)
 
 			f.Close()
 		}
 	}
 
-	ms := &store.MemoryStore{
-		chunkSize: 4096,
-		chunks:    map[string][]byte{},
-	}
-	ld := &chunks.ChunkedDevice{
-		store:     ms,
-		chunkSize: 4096,
-		lock:      syncgroup.NewMutexGroup(),
-	}
-
 	logrus.Infof("Creating device...")
-	nbd := buse.Create(ld, "local-aaa", 4096*1000) // TODO Fix hardcoded size
+	ms, _ := store.NewMemoryStore(4096)
+	ld, _ := chunks.NewChunkedDevice(ms, 4096*1000, 4096)
+	nbd := buse.Create(ld, "local-aaa", 4096*1000)
 
 	logrus.Infof("Creating to device...")
 	dev, err := nbd.Connect()
@@ -83,4 +74,13 @@ func main() {
 
 	c := make(chan struct{})
 	<-c
+}
+
+// ioctl() helper function
+func ioctl(a1, a2, a3 uintptr) (err error) {
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, a1, a2, a3)
+	if errno != 0 {
+		err = errno
+	}
+	return err
 }
