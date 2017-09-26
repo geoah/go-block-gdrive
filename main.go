@@ -46,8 +46,8 @@ func main() {
 	logrus.Infof("Creating device and interface...")
 	// st, _ := store.NewMemoryStore(4096)
 	st, _ := store.NewFileStore("/tmp")
-	ld, _ := chunks.NewChunkedDevice(st, 4096*1000, 4096)
-	ni := nbd.Create(ld, "local-aaa", 4096*1000)
+	ld, _ := chunks.NewChunkedDevice(st, 4096*10000, 4096)
+	ni := nbd.Create(ld, "local-aaa", 4096*10000)
 
 	logrus.Infof("Creating to device...")
 	dev, err := ni.Connect()
