@@ -1,0 +1,10 @@
+package: github.com/geoah/go-block-gdrive
+import:
+- package: github.com/libopenstorage/openstorage
+  subpackages:
+  - volume/drivers/buse
+- package: github.com/sirupsen/logrus
+  version: ^1.0.3
+- package: go.pedge.io/dlog
+- package: github.com/GitbookIO/syncgroup
+  version: 0.2.0
