@@ -29,7 +29,7 @@ type ChunkedDevice struct {
 
 func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
 	cr, _ := d.getChunkInfo(off, int64(len(b)))
-	logrus.WithField("offset", off).WithField("size", len(b)).WithFiled("chunkID", cr.chunkID).Debugf("Reading")
+	logrus.WithField("offset", off).WithField("size", len(b)).WithField("chunkID", cr.chunkID).Debugf("Reading")
 	d.lock.RLock(cr.chunkID)
 	cb, err := d.store.Get(cr.chunkID)
 	if err != nil {
@@ -65,7 +65,7 @@ func (d *ChunkedDevice) WriteAt(b []byte, off int64) (int, error) {
 		left -= csize
 		// find the chunk we need to write to
 		cr, _ := d.getChunkInfo(coff, csize)
-		logrus.WithField("offset", off).WithField("size", len(b)).WithFiled("chunkID", cr.chunkID).Debugf("Writting")
+		logrus.WithField("offset", off).WithField("size", len(b)).WithField("chunkID", cr.chunkID).Debugf("Writting")
 		// update the offset for the next write
 		coff += csize
 		// logrus.
