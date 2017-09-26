@@ -61,7 +61,7 @@ func main() {
 		signal.Notify(c, os.Interrupt)
 		<-c
 		logrus.Infof("Disconnecting device")
-		nbd.Disconnect()
+		ni.Disconnect()
 		logrus.Infof("Done cleaning up NBD devices")
 		os.Exit(0)
 	}()
@@ -78,7 +78,7 @@ func main() {
 
 // IOCTL helper function
 func IOCTL(a1, a2, a3 uintptr) (err error) {
-	_, _, errno := syscall.Syscall(syscall.SYS_nbd.IOCTL, a1, a2, a3)
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, a1, a2, a3)
 	if errno != 0 {
 		err = errno
 	}
