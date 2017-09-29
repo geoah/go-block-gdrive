@@ -31,6 +31,7 @@ func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
 	cr, _ := d.getChunkInfo(off, int64(len(b)))
 	logrus.WithField("offset", off).WithField("size", len(b)).WithField("chunkID", cr.chunkID).Debugf("Reading")
 	d.lock.RLock(cr.chunkID)
+	defer d.lock.RUnlock(cr.chunkID)
 	cb, err := d.store.Get(cr.chunkID)
 	if err != nil {
 		logrus.WithError(err).Warningf("error reading chunk %s", cr.chunkID)
@@ -43,7 +44,6 @@ func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
 		// fmt.Printf(">>> GET(%s) [%x]\n", cr.chunkID, cb[cr.chunkOffset:cr.chunkOffsetEnd])
 		n = copy(b, cb[cr.chunkOffset:cr.chunkOffsetEnd])
 	}
-	d.lock.RUnlock(cr.chunkID)
 	return n, nil
 }
 
