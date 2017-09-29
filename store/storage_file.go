@@ -30,7 +30,7 @@ func (s *FileStore) Get(chunkID string) ([]byte, error) {
 	fn := s.getFilename(chunkID)
 	fl, err := os.Open(fn)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	defer fl.Close()
 
