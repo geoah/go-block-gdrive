@@ -28,10 +28,24 @@ type lruCacheEntry struct {
 	value interface{}
 }
 
+// Create a new LRU of size n. If n <= 0 use defaultCapacity.
+func NewLRU(n int) *LRU {
+	if n <= 0 {
+		n = defaultCapacity
+	}
+
+	return &LRU{
+		mu: new(sync.Mutex),
+		q:  list.New(),
+		m:  make(map[interface{}]*list.Element),
+		c:  n,
+	}
+}
+
 // Put a an entry in the cache with an indexing key.
 // If key already exists just update the value and move to front.
-// If we exceed the cache extract the last item and return its
-// value.
+// If we exceed the cache extract the last item return its
+// value and set rb to true.
 func (l *LRU) Put(key, value interface{}) (rv interface{}, rb bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -41,7 +55,7 @@ func (l *LRU) Put(key, value interface{}) (rv interface{}, rb bool) {
 		value: value,
 	}
 
-	rv, rb = value, false
+	rv = value
 	// Item already exists
 	if e, ok := l.m[key]; ok {
 		e.Value = entry
@@ -49,18 +63,18 @@ func (l *LRU) Put(key, value interface{}) (rv interface{}, rb bool) {
 		return
 	}
 
-	// We have reached our capacity
 	if l.q.Len() < l.c {
 		l.m[key] = l.q.PushFront(entry)
 		return
 	}
 
+	// We have reached our capacity
 	e := l.q.Back()
 	delete(l.m, e.Value.(*lruCacheEntry).key)
 	rv = e.Value.(*lruCacheEntry).value
 	rb = true
 	e.Value = entry
-	l.q.MoveToFront(e)
+	l.m[key] = l.q.MoveToFront(e)
 	return
 }
 
