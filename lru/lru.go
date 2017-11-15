@@ -35,7 +35,7 @@ func NewLRU(n int) *LRU {
 	}
 
 	return &LRU{
-		mu: new(sync.Mutex),
+		mu: &sync.Mutex{},
 		q:  list.New(),
 		m:  make(map[interface{}]*list.Element),
 		c:  n,
@@ -69,12 +69,14 @@ func (l *LRU) Put(key, value interface{}) (rv interface{}, rb bool) {
 	}
 
 	// We have reached our capacity
-	e := l.q.Back()
-	delete(l.m, e.Value.(*lruCacheEntry).key)
 	rv = e.Value.(*lruCacheEntry).value
 	rb = true
+	e := l.q.Back()
+	delete(l.m, e.Value.(*lruCacheEntry).key)
 	e.Value = entry
-	l.m[key] = l.q.MoveToFront(e)
+	l.m[key] = e
+	l.q.MoveToFront(e)
+
 	return
 }
 
