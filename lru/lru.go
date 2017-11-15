@@ -69,9 +69,9 @@ func (l *LRU) Put(key, value interface{}) (rv interface{}, rb bool) {
 	}
 
 	// We have reached our capacity
+	e := l.q.Back()
 	rv = e.Value.(*lruCacheEntry).value
 	rb = true
-	e := l.q.Back()
 	delete(l.m, e.Value.(*lruCacheEntry).key)
 	e.Value = entry
 	l.m[key] = e
@@ -91,4 +91,14 @@ func (l *LRU) Get(key interface{}) (interface{}, bool) {
 	}
 
 	return nil, false
+}
+
+// Flush the LRU. All items not referenced elsewhere will be
+// collected by gc.
+func (l *LRU) Flush() *LRU {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.q.Init()
+	l.m = make(map[interface{}]*list.Element)
+	return l
 }
