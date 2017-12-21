@@ -2,133 +2,145 @@ package chunks
 
 import (
 	"fmt"
+	"math"
+	"sync"
 
 	"github.com/GitbookIO/syncgroup"
 	"github.com/libopenstorage/openstorage/volume/drivers/buse"
 	"github.com/sirupsen/logrus"
 
+	"github.com/geoah/go-block-gdrive/lru"
 	"github.com/geoah/go-block-gdrive/store"
 )
 
-func NewChunkedDevice(store store.Store, size, chunkSize int64) (buse.Device, error) {
+const (
+	defaultDirtyThreshold = 0.20
+)
+
+func NewChunkedDevice(store store.Store, chunkSize, nChunks int64, cacheSize int, dirtyThreshold float64) (buse.Device, error) {
+	if dirtyThreshold > 1 || dirtyThreshold <= 0 {
+		dirtyThreshold = defaultDirtyThreshold
+	}
+	dirtySize := math.Floor(dirtyThreshold * float64(nChunks))
+
 	d := &ChunkedDevice{
-		size:      size,
-		chunkSize: chunkSize,
-		store:     store,
-		lock:      syncgroup.NewMutexGroup(),
+		nChunks:     nChunks,
+		chunkSize:   chunkSize,
+		store:       store,
+		lock:        syncgroup.NewMutexGroup(),
+		lru:         lru.NewLRU(cacheSize),
+		dirtyChunks: lru.NewLRU(dirtySize),
 	}
 	return d, nil
 }
 
 type ChunkedDevice struct {
-	size      int64
-	chunkSize int64
-	store     store.Store
-	lock      *syncgroup.MutexGroup
+	nChunks     int64
+	chunkSize   int64
+	store       store.Store
+	lock        *syncgroup.MutexGroup
+	cache       *lru.LRU
+	dirtyChunks *lru.LRU
+}
+
+type chunk struct {
+	id   int64
+	data []byte
+}
+
+// Push a chunk to the store and optionaly remove it from the
+// dirty cache.
+func (d *ChunkedDevice) pushChunkToStore(c *chunk, removeDirty bool) {
+	d.lock.RLock(c.id)
+	defer d.lock.RUnlock(c.id)
+
+	d.store.Put(c.id, c.data)
+	if removeDirty {
+		d.dirtyChunks.Remove(c.id)
+	}
+}
+
+// Look up the chunk in the cache. If found return it.
+// If not create a new chunk by getting the data from
+// the store. Put in the cache and push any cache left overs
+// back.
+func (d *ChunkedDevice) fetchChunk(id int64) *chunk {
+	d.lock.Lock(id)
+	defer d.lock.Unlock(id)
+
+	c, ok := d.cache.Get(id)
+	if !ok {
+		c = &chunk{
+			id:   id,
+			data: d.store.Get(id),
+		}
+		if v, ok := d.cache.Put(id, c); ok {
+			d.pushChunkToStore(v, true)
+		}
+	}
+	return c.(*chunk)
+}
+
+// Cleanup all dirty chunks by pushing them back
+// to store and then flush the dirty cache.
+func (d *ChunkedDevice) cleanup() (n int) {
+	d.dirtyChunks.Flush(func(c interface{}) {
+		d.pushChunkToStore(c.(*chunk), false)
+		n++
+	})
+
+	return
+}
+
+// Mark a chunk as dirty. If we are over our capacity run a cleanup.
+// Return true if we had to run a cleanup.
+func (d *ChunkedDevice) markAsDirty(c *chunk) bool {
+	v, ok := d.dirtyChunks.Put(c.id, c)
+	if ok {
+		d.pushChunkToStore(c, false)
+		d.cleanup()
+	}
+	return ok
+}
+
+func (d *ChunkedDevice) basicIO(b []byte, off int64, write bool) (int, error) {
+	n := int64(len(b))
+	first := off / d.chunkSize
+	nblocks := n / d.chunkSize
+	if nblocks > d.nChunks {
+		return -1, fmt.Errorf("Requested size exceeds device size")
+	}
+
+	cId := first
+	bS := 0
+	for n > 0 {
+		c := d.fetchChunk(cId)
+		left := d.chunkSize
+		if n < d.chunkSize {
+			left = n
+		}
+		if cId != first {
+			off = 0
+		}
+		r := 0
+		if write {
+			r = copy(c.data[off:left], b[bS:])
+			d.markAsDirty(c)
+		} else {
+			r = copy(b[bS:], c.data[off:left])
+		}
+		bS += r
+		n -= r
+		cId++
+	}
+
+	return n, nil
 }
 
 func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
-	cr, _ := d.getChunkInfo(off, int64(len(b)))
-	logrus.WithField("offset", off).WithField("size", len(b)).WithField("chunkID", cr.chunkID).Debugf("Reading")
-	d.lock.RLock(cr.chunkID)
-	defer d.lock.RUnlock(cr.chunkID)
-	cb, err := d.store.Get(cr.chunkID)
-	if err != nil {
-		logrus.WithError(err).Warningf("error reading chunk %s", cr.chunkID)
-		return 0, err
-	}
-	n := 0
-	if cb != nil {
-		// TODO Check if this is over the size of the device?
-		// fmt.Printf("___ [%d:%d] vs [%d:%d]\n", off, off+int64(len(b)), cr.offsetStart, cr.chunkOffsetEnd)
-		// fmt.Printf(">>> GET(%s) [%x]\n", cr.chunkID, cb[cr.chunkOffset:cr.chunkOffsetEnd])
-		n = copy(b, cb[cr.chunkOffset:cr.chunkOffsetEnd])
-	}
-	return n, nil
+	return d.basicIO(b, off, false)
 }
 
 func (d *ChunkedDevice) WriteAt(b []byte, off int64) (int, error) {
-	size := int64(len(b))
-	left := size
-	coff := off
-	boff := int64(0) // index up to which we have written
-	n := 0
-	// find first chunk we need to write to
-	for {
-		// current size to write
-		csize := left
-		// check max size
-		if left >= d.chunkSize {
-			csize = d.chunkSize
-		}
-		// update how much is left to write
-		left -= csize
-		// find the chunk we need to write to
-		cr, _ := d.getChunkInfo(coff, csize)
-		logrus.WithField("offset", off).WithField("size", len(b)).WithField("chunkID", cr.chunkID).Debugf("Writting")
-		// update the offset for the next write
-		coff += csize
-		// logrus.
-		// 	WithField("chunkID", cr.chunkID).
-		// 	WithField("csize", csize).
-		// 	WithField("coff", coff).
-		// 	WithField("left", left).
-		// 	Debugf("> Writing to chunk")
-		// lock and write chunk
-		d.lock.Lock(cr.chunkID)
-		nn, err := d.store.Put(cr.chunkID, b[boff:boff+csize])
-		if err != nil {
-			logrus.WithError(err).Warningf("error writing chunk %s", cr.chunkID)
-			return 0, err
-		}
-		n += nn
-		// unlock
-		d.lock.Unlock(cr.chunkID)
-		// update boff
-		boff += csize
-		// are we dont yet?
-		if left == 0 {
-			break
-		}
-		// TODO remove - just in case check
-		if left < 0 {
-			panic("left < 0")
-		}
-	}
-
-	return n, nil
-}
-
-func (d *ChunkedDevice) getChunkInfo(off int64, size int64) (Info, error) {
-	chunkOff := int64(0)
-	if off > 0 {
-		chunkOff = off % d.chunkSize
-	}
-
-	part := int64(0)
-	if off > 0 {
-		part = int64(off / d.chunkSize)
-	}
-
-	offStart := off - chunkOff
-	offEnd := offStart + d.chunkSize
-	ci := Info{
-		offsetStart:    offStart,
-		offsetEnd:      offEnd,
-		chunkID:        fmt.Sprintf("part-%d", part),
-		chunkOffset:    chunkOff,
-		chunkOffsetEnd: chunkOff + int64(size),
-	}
-
-	// logrus.
-	// 	WithField("off", off).
-	// 	WithField("size", size).
-	// 	WithField("offsetStart", ci.offsetStart).
-	// 	WithField("offsetEnd", ci.offsetEnd).
-	// 	WithField("chunkID", ci.chunkID).
-	// 	WithField("chunkOffset", ci.chunkOffset).
-	// 	WithField("chunkOffsetEnd", ci.chunkOffsetEnd).
-	// 	Debug("getChunkInfo")
-
-	return ci, nil
+	return d.basicIO(b, off, true)
 }

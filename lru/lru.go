@@ -93,11 +93,34 @@ func (l *LRU) Get(key interface{}) (interface{}, bool) {
 	return nil, false
 }
 
-// Flush the LRU. All items not referenced elsewhere will be
-// collected by gc.
-func (l *LRU) Flush() *LRU {
+// Remove a single item from the cache.
+// Return true if the item was removed
+func (l *LRU) Remove(key interface{}) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	if e, ok := l.m[key]; ok {
+		l.q.Remove(e)
+		delete(l.m, key)
+		return true
+	}
+
+	return false
+}
+
+// Flush the LRU. All items not referenced elsewhere will be
+// collected by gc. If f is not nil execute it for
+// every element of the queue before flushing.
+func (l *LRU) Flush(f func(element interface{})) *LRU {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if f != nil {
+		for e := l.q.Front(); e != nil; e = e.Next() {
+			f(e.Value)
+		}
+	}
+
 	l.q.Init()
 	l.m = make(map[interface{}]*list.Element)
 	return l
