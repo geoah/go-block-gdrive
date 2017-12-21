@@ -144,3 +144,8 @@ func (d *ChunkedDevice) ReadAt(b []byte, off int64) (int, error) {
 func (d *ChunkedDevice) WriteAt(b []byte, off int64) (int, error) {
 	return d.basicIO(b, off, true)
 }
+
+func (d *ChunkedDevice) Flush() error {
+	d.cleanup()
+	return nil
+}

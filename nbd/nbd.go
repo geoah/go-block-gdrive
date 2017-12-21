@@ -64,6 +64,7 @@ func IOCTL(a1, a2, a3 uintptr) (err error) {
 type Device interface {
 	ReadAt(b []byte, off int64) (n int, err error)
 	WriteAt(b []byte, off int64) (n int, err error)
+	Flush() error
 }
 
 type request struct {
@@ -271,6 +272,7 @@ func (nbd *NBD) handle() {
 				nbd.Disconnect()
 				return
 			case NBD_CMD_FLUSH:
+				nbd.device.Flush()
 				fallthrough
 			case NBD_CMD_TRIM:
 				binary.BigEndian.PutUint32(buf[0:4], NBD_REPLY_MAGIC)
