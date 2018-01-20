@@ -3,7 +3,9 @@ import:
 - package: github.com/libopenstorage/openstorage
   subpackages:
   - volume/drivers/buse
-- package: github.com/sirupsen/logrus
+- package: github.com/Sirupsen/logrus
+  repo: git@github.com:/sirupsen/logrus
+  vcs: git
   version: ^1.0.3
 - package: go.pedge.io/dlog
 - package: github.com/GitbookIO/syncgroup
